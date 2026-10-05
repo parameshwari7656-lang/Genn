@@ -1,0 +1,236 @@
+Prac.1
+Text to Image Generation.
+
+!pip install diffusers accelerate
+from diffusers import StableDiffusionPipeline
+import torch
+# Load the pre-trained model
+pipe = StableDiffusionPipeline.from_pretrained("runwayml/stable-
+diffusion-v1-5", torch_dtype=torch.float16)
+pipe = pipe.to("cuda") # Use GPU if available # Generate image
+prompt = "A futuristic city at sunset, cyberpunk style" 
+image = pipe(prompt).images[0]
+# Save the image
+image.save("output.png")
+
+Prac.2
+
+Text to Text Language Translation.
+
+
+!pip install transformers sentencepiece torch
+
+from transformers import M2M100ForConditionalGeneration, M2M100Tokenizer
+model_name = "facebook/m2m100_418M" 
+tokenizer = M2M100Tokenizer.from_pretrained(model_name) 
+model = M2M100ForConditionalGeneration.from_pretrained(model_name)
+langs = { "1": ("English", "en"), "2": ("Hindi", "hi"), "3": ("Marathi", 
+"mr"), "4": ("Gujarati", "gu"), "5": ("French", "fr"), "6": ("German", 
+"de"), "7": ("Spanish", "es"), "8": ("Japanese", "ja"), "9": ("Arabic", 
+"ar") }
+print("Languages:") 
+for n, (name, code) in langs.items():
+print(n, name)
+src = input("\nSource language number: ") 
+dest = input("Destination language number: ") 
+text = input("Enter text: ")
+src_name, src_code = langs[src] 
+dest_name, dest_code = langs[dest]
+tokenizer.src_lang = src_code 
+encoded = tokenizer(text, return_tensors="pt")
+output = model.generate( **encoded, 
+forced_bos_token_id=tokenizer.get_lang_id(dest_code) )
+translation = tokenizer.decode(output[0], skip_special_tokens=True)
+print("\nOriginal:", text) 
+print("Translation:", translation)
+
+
+Prac.3
+Text to Music Generation
+
+from transformers import AutoProcessor, MusicgenForConditionalGeneration
+import scipy.io.wavfile
+def generate_music(prompt):
+processor = AutoProcessor.from_pretrained("facebook/musicgen-small")
+model = 
+MusicgenForConditionalGeneration.from_pretrained("facebook/musicgen-
+small")
+inputs = processor(text=[prompt], padding=True, return_tensors="pt")
+# The generate method returns a tensor of audio values. We need to 
+get the first item from the batch
+# and convert it to a NumPy array for scipy.io.wavfile.write.
+return model.generate(**inputs, max_new_tokens=256)
+if __name__ == "__main__":
+prompt = input("Enter a music description: ")
+if prompt.strip():
+# Assuming musicgen-small generates at 32kHz
+sampling_rate = 32000
+audio_values = generate_music(prompt)[0].cpu().numpy()[0]
+scipy.io.wavfile.write("musicgen_out.wav", rate=sampling_rate, 
+data=audio_values)
+print("Music generated and saved as musicgen_out.wav")
+else:
+print("Error: Prompt cannot be empty.")
+
+
+Prac.4
+
+Image to Text Generation
+
+
+from transformers import BlipProcessor, BlipForConditionalGeneration
+from PIL import Image
+import os
+processor = BlipProcessor.from_pretrained("Salesforce/blip-image-
+captioning-large")
+model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-
+image-captioning-large")
+def describe_image(image_path):
+if not os.path.exists(image_path):
+return "Error: Image file not found."
+try:
+# The processor expects images in RGB format
+raw_image = Image.open(image_path).convert("RGB")
+# Prepare the image for the model
+inputs = processor(images=raw_image, return_tensors="pt")
+# Generate captions
+outputs = model.generate(**inputs, max_new_tokens=100, 
+num_beams=5)
+# Decode the generated tokens to a human-readable caption
+caption = processor.decode(outputs[0], skip_special_tokens=True)
+return caption
+except Exception as e:
+return f"Error: Failed to process image. Details: {e}"
+if __name__ == "__main__":
+image_path = input("Enter image path: ").strip()
+if image_path:
+description = describe_image(image_path)
+print("Description:", description)
+else:
+print("Error: Image path cannot be empty.")
+
+Next step : download the image and upload in the file section and copy the path and paste
+
+
+Prac5
+Text to Speech 
+
+!pip install gTTS
+from gttsimport gTTS
+from IPython.display import Audio 
+# Text to be converted into speech
+text = "Hello, thisis a simple text to speech example." 
+# Convert text to speech
+tts = gTTS(text)
+# Save the audio file 
+tts.save("output_speech.mp3")
+# Play the generated speech (optional, only in Colab or Jupyter) 
+Audio("output_speech.mp3")
+
+
+Prac.6
+
+Text to StoryGeneration
+
+from transformers import pipeline
+# Initialize the GPT-2 text generation pipeline
+generator = pipeline("text-generation", model="gpt2") 
+# Function to generate a story
+def generate_story(prompt, max_length=150): 
+# Generate text
+story = generator(prompt, max_length=max_length, 
+num_return_sequences=1)[0]["generated_text"]
+return story
+# Example usage
+if name == " main ":
+prompt = input("Enter a story prompt (e.g., 'Once upon a time in a magical forest'): ") 
+generated_story = generate_story(prompt)
+print("\nGenerated Story:\n", generated_story)
+
+
+Prac.7
+
+AI Chat Bot
+
+!pip install gradio llama-cpp-python huggingface_hub
+from llama_cpp import Llama 
+# Load model
+llm = Llama.from_pretrained(
+repo_id="TheBloke/zephyr-7B-beta-GGUF", 
+filename="zephyr-7b-beta.Q4_K_M.gguf", 
+n_ctx=4096,
+n_gpu_layers=-1
+)
+# Keep chat history
+history = [{"role": "system", "content": "You are a helpful AI assistant."}] 
+while True:
+prompt = input("You: ") # <-- this acts as your textbox 
+if prompt.lower() in ["exit", "quit", "bye"]:
+print("Exiting chat.") 
+break
+history.append({"role": "user", "content": prompt}) 
+# Get model response
+output = llm.create_chat_completion(messages=history) 
+reply = output["choices"][0]["message"]["content"] 
+history.append({"role": "assistant", "content": reply})
+print(f"Assistant: {reply}\n")
+
+
+Prac.8
+Image to Sketch 
+
+!pip install diffusers transformers accelerate safetensors 
+controlnet_aux opencv-python pillow
+import torch
+from diffusers import (
+StableDiffusionControlNetPipeline,
+ControlNetModel,
+UniPCMultistepScheduler
+)
+from diffusers.utils import load_image
+import cv2
+import numpy as np
+from PIL import Image
+# 1. Load ControlNet (scribble)
+controlnet = ControlNetModel.from_pretrained(
+"lllyasviel/sd-controlnet-scribble", torch_dtype=torch.float16
+)
+# 2. Load Stable Diffusion
+pipe = StableDiffusionControlNetPipeline.from_pretrained(
+"runwayml/stable-diffusion-v1-5", controlnet=controlnet, 
+torch_dtype=torch.float16
+)
+pipe.scheduler = 
+UniPCMultistepScheduler.from_config(pipe.scheduler.config)
+pipe.enable_model_cpu_offload()
+# 3. Load your sketch (line art)
+# Replace with your own sketch path
+input_path = "sketch.jfif"
+# Convert to edge-style (scribble control expects binary edges)
+img = cv2.imread(input_path, cv2.IMREAD_GRAYSCALE)
+img = cv2.Canny(img, 100, 200)
+img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+control_image = Image.fromarray(img)
+# 4. Generate colored image
+prompt = "a colorful illustration of a cute anime character in a fantasy 
+world, vibrant colors"
+output = pipe(prompt, image=control_image, 
+num_inference_steps=25).images[0] # Save result
+output.save("colored.png")
+output.show()
+
+Prac.10
+Music to Text Generation
+
+!pip install -q openai-whisper
+import whisper
+from google.colab import files 
+uploaded = files.upload()
+audio = list(uploaded.keys())[0]
+model = whisper.load_model("base")
+result = model.transcribe(audio) 
+print("Generated Text:")
+print(result["text"])
+with open("music_text.txt", "w") as f:
+ f.write(result["text"]) 
+files.download("music_text.txt")
